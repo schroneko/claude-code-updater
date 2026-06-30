@@ -1,0 +1,133 @@
+#!/bin/zsh
+set -eu
+
+PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+REGISTRY_URL="https://registry.npmjs.org/@anthropic-ai%2fclaude-code"
+INSTALL_URL="https://claude.ai/install.sh"
+DOWNLOAD_BASE_URL="https://downloads.claude.ai/claude-code-releases"
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/claude-code-updater"
+STATE_FILE="$STATE_DIR/version"
+LOG_FILE="$STATE_DIR/run.log"
+LOCK_DIR="$STATE_DIR/lock"
+NOTIFIER_APP="__APP_PATH__"
+
+if [ "${1:-}" = "--help" ]; then
+  printf '%s\n' "claude-code-updater-watch checks npm for Claude Code releases and installs updates."
+  exit 0
+fi
+
+log() {
+  mkdir -p "$STATE_DIR"
+  printf '%s %s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$1" >>"$LOG_FILE"
+}
+
+notify() {
+  local title="$1"
+  local message="$2"
+
+  if [ -d "$NOTIFIER_APP" ]; then
+    /usr/bin/open -g -n "$NOTIFIER_APP" --args "$title" "$message" >/dev/null 2>&1 && return 0
+  fi
+
+  /usr/bin/osascript - "$title" "$message" <<'APPLESCRIPT' >/dev/null 2>&1 || true
+on run argv
+  display notification (item 2 of argv) with title (item 1 of argv)
+end run
+APPLESCRIPT
+}
+
+notify_update_success() {
+  local version="$1"
+  notify "Claude Code Updated." "Ver $version installed."
+}
+
+installed_claude_version() {
+  if command -v claude >/dev/null 2>&1; then
+    claude --version 2>/dev/null | sed -n 's/^\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p' | head -n 1
+  fi
+}
+
+is_newer_version() {
+  local candidate="$1"
+  local current="$2"
+  local result
+
+  result="$(printf '%s\n%s\n' "$candidate" "$current" | awk -F. '
+    NR == 1 { ca=$1; cb=$2; cc=$3; next }
+    NR == 2 {
+      if (ca > $1 || (ca == $1 && cb > $2) || (ca == $1 && cb == $2 && cc > $3)) print "yes";
+      else print "no";
+    }
+  ')"
+
+  [ "$result" = "yes" ]
+}
+
+mkdir -p "$STATE_DIR"
+
+if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+  exit 0
+fi
+
+cleanup() {
+  rmdir "$LOCK_DIR"
+}
+
+trap cleanup EXIT
+
+metadata="$(curl -fsSL "$REGISTRY_URL")"
+
+newest_version="$(printf '%s' "$metadata" | jq -r '
+  [.versions | keys[] | select(test("^[0-9]+\\.[0-9]+\\.[0-9]+$")) | split(".") | map(tonumber)]
+  | sort
+  | last
+  | if . == null then "" else map(tostring) | join(".") end
+')"
+
+if [ -z "$newest_version" ]; then
+  log "no-version-found"
+  exit 0
+fi
+
+if [ -f "$STATE_FILE" ]; then
+  current_version="$(tr -d '[:space:]' <"$STATE_FILE")"
+else
+  current_version="$(installed_claude_version || true)"
+  if [ -z "$current_version" ]; then
+    printf '%s\n' "$newest_version" >"$STATE_FILE"
+    log "initialized-without-claude version=$newest_version"
+    exit 0
+  fi
+  printf '%s\n' "$current_version" >"$STATE_FILE"
+  log "initialized version=$current_version"
+fi
+
+if [ "$current_version" = "$newest_version" ]; then
+  exit 0
+fi
+
+if ! is_newer_version "$newest_version" "$current_version"; then
+  printf '%s\n' "$newest_version" >"$STATE_FILE"
+  log "state-moved-backward old=$current_version new=$newest_version"
+  exit 0
+fi
+
+manifest_url="$DOWNLOAD_BASE_URL/$newest_version/manifest.json"
+
+if ! curl -fsSL -o /dev/null "$manifest_url"; then
+  log "manifest-not-ready version=$newest_version previous=$current_version"
+  exit 0
+fi
+
+log "install-start version=$newest_version previous=$current_version"
+
+if curl -fsSL "$INSTALL_URL" | bash -s -- "$newest_version" >>"$LOG_FILE" 2>&1; then
+  installed_version="$(claude --version 2>/dev/null || printf 'unknown')"
+  printf '%s\n' "$newest_version" >"$STATE_FILE"
+  log "install-success version=$newest_version cli=$installed_version"
+  notify_update_success "$newest_version"
+else
+  log "install-failed version=$newest_version previous=$current_version"
+  notify "Claude Code update failed" "Failed to install $newest_version"
+  exit 1
+fi
