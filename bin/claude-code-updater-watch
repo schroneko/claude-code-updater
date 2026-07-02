@@ -97,9 +97,7 @@ cleanup() {
 
 trap cleanup EXIT
 
-metadata="$(curl -fsSL "$REGISTRY_URL")"
-
-newest_version="$(printf '%s' "$metadata" | jq -r '
+newest_version="$(curl -fsSL -H 'Accept: application/vnd.npm.install-v1+json' "$REGISTRY_URL" | jq -r '
   [.versions | keys[] | select(test("^[0-9]+\\.[0-9]+\\.[0-9]+$")) | split(".") | map(tonumber)]
   | sort
   | last
