@@ -1,7 +1,7 @@
 class ClaudeCodeUpdater < Formula
   desc "Automatically update Claude Code from npm and show a macOS banner notification"
   homepage "https://github.com/schroneko/claude-code-updater"
-  url "https://github.com/schroneko/claude-code-updater.git", tag: "v0.1.0"
+  url "https://github.com/schroneko/claude-code-updater.git", tag: "v0.1.1"
   license "MIT"
 
   depends_on "jq"
