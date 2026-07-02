@@ -1,5 +1,5 @@
 #!/bin/zsh
-set -eu
+set -eu -o pipefail
 
 PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 REGISTRY_URL="https://registry.npmjs.org/@anthropic-ai%2fclaude-code"
@@ -17,8 +17,30 @@ if [ "${1:-}" = "--help" ]; then
 fi
 
 log() {
-  mkdir -p "$STATE_DIR"
   printf '%s %s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$1" >>"$LOG_FILE"
+}
+
+acquire_lock() {
+  local owner_pid
+
+  if mkdir "$LOCK_DIR" 2>/dev/null; then
+    printf '%s\n' "$$" >"$LOCK_DIR/pid"
+    return 0
+  fi
+
+  owner_pid=""
+  if [ -f "$LOCK_DIR/pid" ]; then
+    owner_pid="$(tr -d '[:space:]' <"$LOCK_DIR/pid" || true)"
+  fi
+
+  if [ -n "$owner_pid" ] && ps -p "$owner_pid" >/dev/null 2>&1; then
+    return 1
+  fi
+
+  log "stale-lock-removed pid=${owner_pid:-unknown}"
+  rm -rf "$LOCK_DIR"
+  mkdir "$LOCK_DIR" 2>/dev/null || return 1
+  printf '%s\n' "$$" >"$LOCK_DIR/pid"
 }
 
 notify() {
@@ -65,12 +87,12 @@ is_newer_version() {
 
 mkdir -p "$STATE_DIR"
 
-if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+if ! acquire_lock; then
   exit 0
 fi
 
 cleanup() {
-  rmdir "$LOCK_DIR"
+  rm -rf "$LOCK_DIR"
 }
 
 trap cleanup EXIT
