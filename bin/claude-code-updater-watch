@@ -97,7 +97,7 @@ cleanup() {
 
 trap cleanup EXIT
 
-newest_version="$(curl -fsSL -H 'Accept: application/vnd.npm.install-v1+json' "$REGISTRY_URL" | jq -r '
+newest_version="$(curl -fsSL --connect-timeout 10 --max-time 60 -H 'Accept: application/vnd.npm.install-v1+json' "$REGISTRY_URL" | jq -r '
   [.versions | keys[] | select(test("^[0-9]+\\.[0-9]+\\.[0-9]+$")) | split(".") | map(tonumber)]
   | sort
   | last
@@ -134,14 +134,14 @@ fi
 
 manifest_url="$DOWNLOAD_BASE_URL/$newest_version/manifest.json"
 
-if ! curl -fsSL -o /dev/null "$manifest_url"; then
+if ! curl -fsSL --connect-timeout 10 --max-time 60 -o /dev/null "$manifest_url"; then
   log "manifest-not-ready version=$newest_version previous=$current_version"
   exit 0
 fi
 
 log "install-start version=$newest_version previous=$current_version"
 
-if curl -fsSL "$INSTALL_URL" | bash -s -- "$newest_version" >>"$LOG_FILE" 2>&1; then
+if curl -fsSL --connect-timeout 10 --max-time 60 "$INSTALL_URL" | bash -s -- "$newest_version" >>"$LOG_FILE" 2>&1; then
   installed_version="$(claude --version 2>/dev/null || printf 'unknown')"
   printf '%s\n' "$newest_version" >"$STATE_FILE"
   log "install-success version=$newest_version cli=$installed_version"
