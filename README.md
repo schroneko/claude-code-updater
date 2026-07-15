@@ -7,7 +7,12 @@ Claude Code Updated.
 Ver x.y.z installed.
 ```
 
-The notification is sent by `Claude Code Updater.app`, a small menu-less macOS app bundled with this Homebrew formula.
+## Components
+
+- `bin/claude-code-updater-watch`: a zsh script that performs one update check per run. Homebrew installs it into `$(brew --prefix)/bin`, and the Homebrew service runs it every 60 seconds.
+- `Sources/ClaudeCodeUpdater/ClaudeCodeUpdater.swift`: the source of `Claude Code Updater.app`, a small menu-less macOS app compiled by the formula at install time. The watcher launches it once per notification; the app posts the banner and quits a few seconds later. Clicking the banner just dismisses it.
+- `Formula/claude-code-updater.rb`: the Homebrew formula. It builds the app with `swiftc`, ad-hoc signs it, installs the watcher, and defines the interval service. This repository doubles as its own Homebrew tap.
+- `scripts/release.sh`: release automation. See the Release section.
 
 ## Requirements
 
@@ -28,17 +33,21 @@ The service checks npm every 60 seconds.
 
 ## Manual Run
 
+The watcher is a normal command, so a single check can be run by hand:
+
 ```sh
 claude-code-updater-watch
 ```
 
-## Logs
+A run exits quietly when Claude Code is already up to date. `claude-code-updater-watch --help` prints a short description.
 
-The watcher writes its own log to:
+## State and Logs
 
-```text
-~/.local/state/claude-code-updater/run.log
-```
+The watcher keeps its state under `~/.local/state/claude-code-updater/` (or `$XDG_STATE_HOME/claude-code-updater/`):
+
+- `version`: the version the watcher considers installed
+- `run.log`: the watcher's own log, including installer output
+- `lock/`: a lock directory that prevents overlapping runs
 
 Homebrew service logs are available at:
 
@@ -49,16 +58,21 @@ $(brew --prefix)/var/log/claude-code-updater.err.log
 
 ## How It Works
 
-1. Fetches `@anthropic-ai/claude-code` metadata from npm.
-2. Selects the highest stable `x.y.z` version.
-3. Waits until the Claude downloads manifest exists.
-4. Runs the official installer:
+Each run of `claude-code-updater-watch`:
+
+1. Acquires the lock, removing a stale one first if a previous run died.
+2. Fetches abbreviated `@anthropic-ai/claude-code` metadata from npm and selects the highest stable `x.y.z` version.
+3. Compares it with the recorded state. On the first run the state is initialized from `claude --version` and nothing is installed.
+4. Waits until the release manifest exists at `https://downloads.claude.ai/claude-code-releases/x.y.z/manifest.json`, because npm metadata can appear before the binaries are published.
+5. Runs the official installer:
 
 ```sh
 curl -fsSL https://claude.ai/install.sh | bash -s -- x.y.z
 ```
 
-5. Shows a macOS banner from `Claude Code Updater.app`.
+6. Records the new version and shows a macOS banner from `Claude Code Updater.app`. If the app is missing, it falls back to `osascript`. A failed install posts a failure banner instead and keeps the previous state so the next run retries.
+
+All network calls use connect and total timeouts, so a hung npm or CDN endpoint cannot wedge the service.
 
 ## Release
 
@@ -73,6 +87,8 @@ It bumps the formula to the next patch version, commits, tags, pushes `main` and
 ```sh
 scripts/release.sh 0.2.0
 ```
+
+Documentation-only changes do not need a release, since the formula installs nothing from `README.md`.
 
 ## Uninstall
 
