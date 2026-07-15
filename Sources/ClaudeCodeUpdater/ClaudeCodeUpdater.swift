@@ -5,11 +5,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
 
-        let args = CommandLine.arguments.dropFirst()
-        let title = args.first ?? "Claude Code Updated."
-        let body = args.dropFirst().first ?? "Ver unknown installed."
         let center = UNUserNotificationCenter.current()
         center.delegate = self
+
+        let args = Array(CommandLine.arguments.dropFirst())
+        guard args.count == 2 else {
+            NSApp.terminate(nil)
+            return
+        }
+
+        let title = args[0]
+        let body = args[1]
 
         center.requestAuthorization(options: [.alert]) { _, _ in
             let content = UNMutableNotificationContent()
@@ -31,6 +37,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
         completionHandler([.banner])
+    }
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        completionHandler()
+        NSApp.terminate(nil)
     }
 }
 
