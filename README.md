@@ -60,6 +60,20 @@ curl -fsSL https://claude.ai/install.sh | bash -s -- x.y.z
 
 5. Shows a macOS banner from `Claude Code Updater.app`.
 
+## Release
+
+The Homebrew formula builds from a git tag, so source changes on `main` are not delivered until the formula is bumped and a new tag is pushed. Run the release script to do all of it in one step:
+
+```sh
+scripts/release.sh
+```
+
+It bumps the formula to the next patch version, commits, tags, pushes `main` and the tag, then upgrades the local Homebrew install and restarts the service. Pass a version to override the patch bump:
+
+```sh
+scripts/release.sh 0.2.0
+```
+
 ## Uninstall
 
 ```sh
