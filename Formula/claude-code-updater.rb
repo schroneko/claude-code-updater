@@ -22,12 +22,12 @@ class ClaudeCodeUpdater < Formula
 
     libexec.install app
 
-    inreplace "bin/claude-code-updater-watch", "__APP_PATH__", libexec/"Claude Code Updater.app"
-    bin.install "bin/claude-code-updater-watch"
+    inreplace "bin/claude-code-updater", "__APP_PATH__", libexec/"Claude Code Updater.app"
+    bin.install "bin/claude-code-updater"
   end
 
   service do
-    run [opt_bin/"claude-code-updater-watch"]
+    run [opt_bin/"claude-code-updater"]
     run_type :interval
     interval 60
     log_path var/"log/claude-code-updater.log"
@@ -36,6 +36,6 @@ class ClaudeCodeUpdater < Formula
 
   test do
     assert_path_exists libexec/"Claude Code Updater.app/Contents/MacOS/ClaudeCodeUpdater"
-    assert_match "claude-code-updater-watch", shell_output("#{bin}/claude-code-updater-watch --help")
+    assert_match "claude-code-updater", shell_output("#{bin}/claude-code-updater --help")
   end
 end

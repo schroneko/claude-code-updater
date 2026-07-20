@@ -12,7 +12,7 @@ LOCK_DIR="$STATE_DIR/lock"
 NOTIFIER_APP="__APP_PATH__"
 
 if [ "${1:-}" = "--help" ]; then
-  printf '%s\n' "claude-code-updater-watch checks npm for Claude Code releases and installs updates."
+  printf '%s\n' "claude-code-updater checks npm for Claude Code releases and installs updates."
   exit 0
 fi
 

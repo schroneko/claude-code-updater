@@ -9,7 +9,7 @@ Ver x.y.z installed.
 
 ## Components
 
-- `bin/claude-code-updater-watch`: a zsh script that performs one update check per run. Homebrew installs it into `$(brew --prefix)/bin`, and the Homebrew service runs it every 60 seconds.
+- `bin/claude-code-updater`: a zsh script that performs one update check per run. Homebrew installs it into `$(brew --prefix)/bin`, and the Homebrew service runs it every 60 seconds.
 - `Sources/ClaudeCodeUpdater/ClaudeCodeUpdater.swift`: the source of `Claude Code Updater.app`, a small menu-less macOS app compiled by the formula at install time. The watcher launches it once per notification; the app posts the banner and quits a few seconds later. Clicking the banner just dismisses it.
 - `Formula/claude-code-updater.rb`: the Homebrew formula. It builds the app with `swiftc`, ad-hoc signs it, installs the watcher, and defines the interval service. This repository doubles as its own Homebrew tap.
 - `scripts/release.sh`: release automation. See the Release section.
@@ -36,10 +36,10 @@ The service checks npm every 60 seconds.
 The watcher is a normal command, so a single check can be run by hand:
 
 ```sh
-claude-code-updater-watch
+claude-code-updater
 ```
 
-A run exits quietly when Claude Code is already up to date. `claude-code-updater-watch --help` prints a short description.
+A run exits quietly when Claude Code is already up to date. `claude-code-updater --help` prints a short description.
 
 ## State and Logs
 
@@ -58,7 +58,7 @@ $(brew --prefix)/var/log/claude-code-updater.err.log
 
 ## How It Works
 
-Each run of `claude-code-updater-watch`:
+Each run of `claude-code-updater`:
 
 1. Acquires the lock, removing a stale one first if a previous run died.
 2. Fetches abbreviated `@anthropic-ai/claude-code` metadata from npm and selects the highest stable `x.y.z` version.
